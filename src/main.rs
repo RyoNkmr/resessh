@@ -49,7 +49,7 @@ fn exec(cmd: Command) {
             execvp(&args[0], &args).unwrap();
         }
         Err(e) => {
-            panic!("resessh panic!");
+            panic!("resessh panic!: {}", e);
         }
     }
 }
