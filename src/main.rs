@@ -1,16 +1,21 @@
-use nix::unistd;
+use nix::sys::wait::waitpid;
+use nix::unistd::{execvp, fork, ForkResult};
 use std::ffi::CString;
 use std::io::{self, Write};
 
 fn main() -> io::Result<()> {
-    print!("resessh :> ");
-    io::stdout().flush()?;
+    let stdin = io::stdin();
+    loop {
+        print!("rsh: ");
+        io::stdout().flush()?;
 
-    for line in io::stdin().lines() {
-        let cmd = parse(line.unwrap());
+        let mut buf = String::new();
+        stdin.read_line(&mut buf).ok().expect("read_line failed");
+        buf.pop();
+
+        let cmd = parse(buf);
         exec(cmd);
     }
-    Ok(())
 }
 
 #[derive(Debug)]
@@ -28,10 +33,23 @@ fn parse(line: String) -> Command {
 }
 
 fn exec(cmd: Command) {
+    println!("{:?}", cmd);
+
     let args: Vec<CString> = cmd
         .argv
         .into_iter()
         .map(|v| CString::new(v).unwrap())
         .collect();
-    unistd::execvp(&args[0], &args).unwrap();
+
+    match unsafe { fork() } {
+        Ok(ForkResult::Parent { child, .. }) => {
+            waitpid(child, None).unwrap();
+        }
+        Ok(ForkResult::Child) => {
+            execvp(&args[0], &args).unwrap();
+        }
+        Err(e) => {
+            panic!("resessh panic!");
+        }
+    }
 }
